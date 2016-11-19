@@ -1,5 +1,11 @@
-<ul>
-    {% for question in latest_question_list %}
-        <li><a href="{% url 'fpl_data:detail' %}">{{ users.user_name }}</a></li>
+
+<body>
+
+    <h1>Drongy's</h1>
+    <h2> {{ standings.user_name }}</h2>
+    <ul>
+    {% for user_total in standings %}
+        <li>{{ user_total }}</li>
     {% endfor %}
-</ul>
+    </ul>
+</body>
