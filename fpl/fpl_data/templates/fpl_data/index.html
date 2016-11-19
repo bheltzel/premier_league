@@ -1,0 +1,5 @@
+<ul>
+    {% for question in latest_question_list %}
+        <li><a href="{% url 'fpl_data:detail' %}">{{ users.user_name }}</a></li>
+    {% endfor %}
+</ul>
