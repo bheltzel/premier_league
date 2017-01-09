@@ -1,121 +1,105 @@
 from django.shortcuts import render, render_to_response
-from chartit import PivotDataPool, PivotChart, DataPool, Chart
-
 from .models import Users, Players
+from .sheets import sheet_dump, bulk_sheet_dump
+from .constants import *
 import requests
-import math
 import json
 
-league_id_const = "270578"
 
-url_fpl = "https://fantasy.premierleague.com/drf/"
-url_standings = "leagues-classic-standings/"
-url_players = "bootstrap-static"
+def get_users_scores(league_id, page):
+    response = requests.get(url_fpl + url_standings + str(league_id) + "?phase=1&le-page=1&ls-page=" + str(page)).json()
+    with open("league_standings.json", 'w') as outfile:
+        json.dump(response, outfile)
 
+    with open("league_standings.json") as json_data:
+        all_users = json.load(json_data)
 
-def get_players():
-    Players.objects.all().delete()
-    r = requests.get(url_fpl + url_players).json()
-    all_players = r["elements"]
-    if not all_players:
-        return None
+    map_user_name = {}
+    entries = []
+    # for user in all_users["standings"]["results"]:
+    #     map_user_name[str(user["entry"])] = user["entry_name"]
+    #     # entries[user["entry_name"]]  #.encode('ascii', 'ignore'))
+    #     print(user)
+    #     for gameweek in range(1, 12):
+    #         json_response = requests.get(url_fpl + "entry/" + str(user["entry"]) + "/event/" + str(gameweek) + "/picks").json()
+    #         all_entries = json_response["entry_history"]
+    #         pts = all_entries.get("points")
+    #         u_name = map_user_name[str(user["entry"])]
+    #         # sheet_dump(u_name, pts, gameweek, gameweek)
+    #
+    #         print(u_name + ', ' + str(pts))
+    #         gameweek += 1
 
-    for player in all_players:
-        # p_name = player.get("web_name")
-        Players(player_name=player.get("web_name")).save()
+    for gameweek in range(1, 2):
+        week_winner_name = ''
+        week_winner_pts = 0
+        for user in all_users["standings"]["results"]:
+            json_response = requests.get(
+                url_fpl + "entry/" + str(user["entry"]) + "/event/" + str(gameweek) + "/picks").json()
+            map_user_name[str(user["entry"])] = user["entry_name"]
 
-    return None
+            all_entries = json_response["entry_history"]
+            pts = all_entries.get("points")
+            u_name = map_user_name[str(user["entry"])]
+            #
+            # i stopped here on 1/5. im trying to create a list so i can dump that list into the google sheet.
+            # figure out how to create a list. current sheet dump bulk setup does work
+            #
+            entries.insert[gameweek, pts, u_name]
+            if pts > week_winner_pts:
+                week_winner_pts = pts
+                week_winner_name = u_name
 
+        # print(str(gameweek) + ': ' + week_winner_name + ', ' + str(week_winner_pts))
+        # print(week_winner_name)
+        print(entries)
+        gameweek += 1
+    #
+    # # for user in all_users["standings"]["results"]:
+    #     user_id = user.get("entry")
+    #     for gameweek in range(1, 12):
+    #         json_response = requests.get(url_fpl + "entry/" + str(user_id) + "/event/" + str(gameweek) + "/picks").json()
+    #         all_entries = json_response["entry_history"]
+    #         pts = all_entries.get("points")
+    #         u_name = map_user_name[str(user_id)]
+    #         # sheet_dump(u_name, pts, gameweek, gameweek)
+    #
+    #         gameweek += 1
 
-def get_picks(user_id, gameweek):
-    r = requests.get(url_fpl + "entry/" + str(user_id) + "event/" + str(gameweek) + "/picks").json()["picks"]
-    if not r:
-        return None
+    # print(map_user_name)
 
-    for p in r:
-        print(p["element"])
-
-
-def get_gameweek_score(user_id, gameweek):
-    url = url_fpl + "entry/" + str(user_id) + "/event/" + str(gameweek) + "/picks"
-    print(url)
-    r = requests.get(url)
-    resp = r.json()
-    all_picks = resp["entry_history"]
-    if not all_picks:
-        return None
-
-    for u in all_picks:
-        tot = u.get["total_points"]
-        print(tot)
-
-    return None
-
-
-def get_users_scores(user_id):
-    x = 1
-    if x != 13:
-        print(get_gameweek_score(user_id, x))
-        x = x + 1
+    # bulk_sheet_dump(map_user_name)
 
 
 def get_users(league_id, page):
-    url_league = url_fpl + url_standings + str(league_id) + "?phase=1&le-page=1&ls-page=" + str(page)
-    req = requests.get(url_league)
-    json_response = req.json()
+    json_response = requests.get(url_fpl + url_standings + str(league_id) + "?phase=1&le-page=1&ls-page=" + str(page)).json()
     json_standings = json_response["standings"]["results"]
     if not json_standings:
         return None
 
-    entries = []
-
     Users.objects.all().delete()
+    row_num = 1
 
     for user in json_standings:
-        entries.append(user["entry_name"].encode('ascii', 'ignore'))
         u_name = user.get("entry_name")
         u_rank = user.get("rank")
         u_total = user.get("total")
-        print(u_name + ", " + str(u_rank) + ", " + str(""))
-
+        # sheet_dump(u_name, u_rank, u_total, row_num)
+        # print(u_name + ", " + str(u_rank) + ", " + str(u_total))
+        row_num += 1
         Users(user_name=u_name, user_rank=u_rank, user_total=u_total).save()
 
-    return entries
+    return None
 
 
 def index(request):
     get_users(league_id_const, 1)
-    get_users_scores("2677936")
+
+    get_users_scores(league_id_const, 1)
+
+    # bulk_sheet_dump([["a1", "b1"], ["a2", "b2"]])
+
     standings = Users.objects.order_by('-user_total')
-    # standings = Users.objects.filter(user_rank=2)
     context = {'standings': standings}
 
-    #print(standings)
-    #print(Users.objects.count())
     return render(request, 'fpl_data/index.html', context)
-
-#
-# def chart():
-#     ds = DataPool(
-#         series=
-#         [{'options': {
-#             'source': Users.objects.all()},
-#             'terms': [
-#                 'id',
-#                 'user_total',
-#                 ]}
-#         ])
-#
-#     cht = Chart(
-#         datasource=ds,
-#         series_options=[
-#             {'options': {
-#               'type': 'line',
-#               'stacking': False},
-#                 'terms': {
-#                     'id': [
-#                         'user_total']
-#               }}],
-#         )
-#
-#     return render_to_response({'cht': cht})
